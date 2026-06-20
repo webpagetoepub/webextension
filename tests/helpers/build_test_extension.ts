@@ -4,7 +4,7 @@ import { join, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
 import * as esbuild from "esbuild";
 // @ts-expect-error - plain .mjs build helper without type declarations
-import mergeManifest from "../../build/merge_manifest.mjs";
+import mergeManifest from "../../scripts/merge_manifest.mjs";
 
 const root = join(dirname(fileURLToPath(import.meta.url)), "..", "..");
 

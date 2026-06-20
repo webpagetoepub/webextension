@@ -27,7 +27,7 @@ src/
     manifest.base.json
     manifest.chrome.json
     manifest.firefox.json
-build/             # esbuild scripts that merge manifests and bundle src/
+scripts/           # esbuild scripts that merge manifests and bundle src/
 dist/              # generated; git-ignored
   chrome/
   firefox/
@@ -42,7 +42,7 @@ tests/
 - `npm run build` — produce `dist/chrome` and `dist/firefox` (load each as an unpacked extension).
 - `npm run build:chrome` / `npm run build:firefox` — build a single target.
 - `npm run typecheck` — `tsc --noEmit` via `tsconfig.typecheck.json` (uses a path stub for `html2epub` to keep type-checking scoped to our own code).
-- `npm run lint` — ESLint over `src/`, `tests/`, and `build/`.
+- `npm run lint` — ESLint over `src/`, `tests/`, and `scripts/`.
 - `npm run format` — Prettier.
 - `npm test` — Playwright.
 

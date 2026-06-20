@@ -12,12 +12,12 @@
   "author": "Carlson Santana Cruz",
   "type": "module",
   "scripts": {
-    "build": "node build/build.mjs",
-    "build:chrome": "node build/build.mjs chrome",
-    "build:firefox": "node build/build.mjs firefox",
+    "build": "node scripts/build.mjs",
+    "build:chrome": "node scripts/build.mjs chrome",
+    "build:firefox": "node scripts/build.mjs firefox",
     "typecheck": "tsc --noEmit -p tsconfig.typecheck.json",
-    "lint": "eslint src tests build",
-    "format": "prettier --write \"{src,tests,build}/**/*.{ts,mjs,js,json,html}\"",
+    "lint": "eslint src tests scripts",
+    "format": "prettier --write \"{src,tests,scripts}/**/*.{ts,mjs,js,json,html}\"",
     "test": "playwright test"
   },
   "dependencies": {
