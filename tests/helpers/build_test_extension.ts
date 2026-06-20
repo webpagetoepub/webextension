@@ -1,4 +1,4 @@
-import { mkdtemp, copyFile, writeFile } from "node:fs/promises";
+import { mkdtemp, copyFile, writeFile, mkdir, readdir } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -36,6 +36,14 @@ export default async function buildTestExtension(): Promise<string> {
     join(outDir, "harness.html"),
   );
   await writeFile(join(outDir, "background.js"), "// id-discovery only\n");
+
+  const iconsDir = join(root, "src/icons");
+  const outIconsDir = join(outDir, "icons");
+  await mkdir(outIconsDir, { recursive: true });
+  const iconFiles = await readdir(iconsDir);
+  await Promise.all(
+    iconFiles.map((f) => copyFile(join(iconsDir, f), join(outIconsDir, f))),
+  );
 
   const manifest = await mergeManifest("chrome");
   manifest.background = { service_worker: "background.js" };

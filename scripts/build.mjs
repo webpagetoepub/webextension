@@ -1,4 +1,4 @@
-import { rm, mkdir, copyFile, writeFile } from "node:fs/promises";
+import { rm, mkdir, copyFile, writeFile, readdir } from "node:fs/promises";
 import { fileURLToPath } from "node:url";
 import { dirname, join } from "node:path";
 import * as esbuild from "esbuild";
@@ -26,6 +26,16 @@ async function bundlePopup(browser, outDir) {
   });
 }
 
+async function copyIcons(outDir) {
+  const iconsDir = join(root, "src/icons");
+  const outIconsDir = join(outDir, "icons");
+  await mkdir(outIconsDir, { recursive: true });
+  const files = await readdir(iconsDir);
+  await Promise.all(
+    files.map((f) => copyFile(join(iconsDir, f), join(outIconsDir, f))),
+  );
+}
+
 async function buildBrowser(browser) {
   const outDir = join(root, "dist", browser);
   await rm(outDir, { recursive: true, force: true });
@@ -36,6 +46,7 @@ async function buildBrowser(browser) {
     join(root, "src/popup/popup.html"),
     join(outDir, "popup.html"),
   );
+  await copyIcons(outDir);
 
   const manifest = await mergeManifest(browser);
   await writeFile(
