@@ -2,7 +2,7 @@ import { rm, mkdir, copyFile, writeFile, readdir } from "node:fs/promises";
 import { fileURLToPath } from "node:url";
 import { dirname, join } from "node:path";
 import * as esbuild from "esbuild";
-import mergeManifest from "./merge_manifest.js";
+import mergeManifest from "./merge_manifest";
 
 const root = join(dirname(fileURLToPath(import.meta.url)), "..");
 const ALL_BROWSERS = ["chrome", "firefox"] as const;

@@ -3,7 +3,7 @@ import { tmpdir } from "node:os";
 import { join, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
 import * as esbuild from "esbuild";
-import mergeManifest from "../../scripts/merge_manifest.js";
+import mergeManifest from "../../scripts/merge_manifest";
 
 const root = join(dirname(fileURLToPath(import.meta.url)), "..", "..");
 
