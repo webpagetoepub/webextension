@@ -1,0 +1,8 @@
+{
+  "browser_specific_settings": {
+    "gecko": {
+      "id": "webpage2epub@webpagetoepub.github.io",
+      "strict_min_version": "115.0"
+    }
+  }
+}
