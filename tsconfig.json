@@ -14,5 +14,5 @@
     "types": ["node", "webextension-polyfill"],
     "noEmit": true
   },
-  "include": ["src", "tests", "build"]
+  "include": ["src", "tests", "scripts"]
 }

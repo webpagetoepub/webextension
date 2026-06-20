@@ -2,19 +2,20 @@ import { rm, mkdir, copyFile, writeFile, readdir } from "node:fs/promises";
 import { fileURLToPath } from "node:url";
 import { dirname, join } from "node:path";
 import * as esbuild from "esbuild";
-import mergeManifest from "./merge_manifest.mjs";
+import mergeManifest from "./merge_manifest.js";
 
 const root = join(dirname(fileURLToPath(import.meta.url)), "..");
-const ALL_BROWSERS = ["chrome", "firefox"];
+const ALL_BROWSERS = ["chrome", "firefox"] as const;
+type Browser = (typeof ALL_BROWSERS)[number];
 
 // esbuild targets per browser. html2epub ships raw TS and imports a .png as a
 // data URL (node_modules/html2epub/src/load_images.ts), so we transpile deps and
 // map .png -> dataurl. Output is ESM because popup.html loads popup.js as a module.
-function buildTargets(browser) {
+function buildTargets(browser: Browser): string[] {
   return browser === "firefox" ? ["firefox115"] : ["chrome111"];
 }
 
-async function bundlePopup(browser, outDir) {
+async function bundlePopup(browser: Browser, outDir: string): Promise<void> {
   await esbuild.build({
     entryPoints: [join(root, "src/popup/popup.ts")],
     bundle: true,
@@ -26,7 +27,7 @@ async function bundlePopup(browser, outDir) {
   });
 }
 
-async function copyIcons(outDir) {
+async function copyIcons(outDir: string): Promise<void> {
   const iconsDir = join(root, "src/icons");
   const outIconsDir = join(outDir, "icons");
   await mkdir(outIconsDir, { recursive: true });
@@ -36,7 +37,7 @@ async function copyIcons(outDir) {
   );
 }
 
-async function buildBrowser(browser) {
+async function buildBrowser(browser: Browser): Promise<void> {
   const outDir = join(root, "dist", browser);
   await rm(outDir, { recursive: true, force: true });
   await mkdir(outDir, { recursive: true });
@@ -58,8 +59,10 @@ async function buildBrowser(browser) {
 }
 
 const requested = process.argv[2];
-const browsers = requested ? [requested] : ALL_BROWSERS;
-if (requested && !ALL_BROWSERS.includes(requested)) {
+const browsers: Browser[] = requested
+  ? [requested as Browser]
+  : [...ALL_BROWSERS];
+if (requested && !(ALL_BROWSERS as readonly string[]).includes(requested)) {
   throw new Error(
     `Unknown browser "${requested}"; expected one of ${ALL_BROWSERS.join(", ")}`,
   );
