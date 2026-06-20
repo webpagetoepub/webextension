@@ -18,6 +18,7 @@
     "typecheck": "tsc --noEmit -p tsconfig.typecheck.json",
     "lint": "eslint src tests scripts",
     "format": "prettier --write \"{src,tests,scripts}/**/*.{ts,mjs,js,json,html}\"",
+    "format:check": "prettier --check \"{src,tests,scripts}/**/*.{ts,mjs,js,json,html}\"",
     "test": "playwright test"
   },
   "dependencies": {
