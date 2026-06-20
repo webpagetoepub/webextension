@@ -5,6 +5,7 @@ import { dirname, join } from "node:path";
 const manifestDir = join(
   dirname(fileURLToPath(import.meta.url)),
   "..",
+  "src",
   "manifest",
 );
 

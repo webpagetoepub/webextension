@@ -23,10 +23,10 @@ src/
   popup/           # popup UI (HTML + TS) — the only extension entry point
   lib/             # shared helpers: browser shim, html2epub wrapper, logger, downloader
   types/           # hand-written .d.ts stubs (html2epub, for typecheck only)
-manifest/
-  manifest.base.json
-  manifest.chrome.json
-  manifest.firefox.json
+  manifest/        # per-browser manifest fragments, merged at build time
+    manifest.base.json
+    manifest.chrome.json
+    manifest.firefox.json
 build/             # esbuild scripts that merge manifests and bundle src/
 dist/              # generated; git-ignored
   chrome/
