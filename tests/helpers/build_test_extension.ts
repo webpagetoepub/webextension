@@ -7,16 +7,18 @@ import mergeManifest from "../../scripts/merge_manifest";
 
 const root = join(dirname(fileURLToPath(import.meta.url)), "..", "..");
 
-// Builds an unpacked Chrome extension into a temp dir: the production popup plus
-// a test-only harness page (real conversion code) and a trivial background
-// service worker. The background SW exists solely so Playwright can read the
-// extension id from context.serviceWorkers(); production ships no background.
+// Builds an unpacked Chrome extension into a temp dir: the production popup,
+// background service worker and offscreen document, plus a test-only harness page
+// (real conversion code) used by the fast structural specs. The real background
+// SW also doubles as the id source for context.serviceWorkers().
 export default async function buildTestExtension(): Promise<string> {
   const outDir = await mkdtemp(join(tmpdir(), "webpage2epub-ext-"));
 
   await esbuild.build({
     entryPoints: {
       popup: join(root, "src/popup/popup.ts"),
+      background: join(root, "src/background/background.ts"),
+      offscreen: join(root, "src/offscreen/offscreen.ts"),
       harness: join(root, "tests/harness/harness.ts"),
     },
     bundle: true,
@@ -31,10 +33,13 @@ export default async function buildTestExtension(): Promise<string> {
     join(outDir, "popup.html"),
   );
   await copyFile(
+    join(root, "src/offscreen/offscreen.html"),
+    join(outDir, "offscreen.html"),
+  );
+  await copyFile(
     join(root, "tests/harness/harness.html"),
     join(outDir, "harness.html"),
   );
-  await writeFile(join(outDir, "background.js"), "// id-discovery only\n");
 
   const iconsDir = join(root, "src/icons");
   const outIconsDir = join(outDir, "icons");
@@ -44,8 +49,9 @@ export default async function buildTestExtension(): Promise<string> {
     iconFiles.map((f) => copyFile(join(iconsDir, f), join(outIconsDir, f))),
   );
 
+  // The merged chrome manifest already declares the background service worker
+  // and the offscreen permission — no test-only patching needed.
   const manifest = await mergeManifest("chrome");
-  manifest.background = { service_worker: "background.js" };
   await writeFile(
     join(outDir, "manifest.json"),
     JSON.stringify(manifest, null, 2),

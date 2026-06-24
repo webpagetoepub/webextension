@@ -1,0 +1,13 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>Webpage to ePub conversion worker</title>
+  </head>
+  <body>
+    <!-- Hidden, headless page. Exists only to give html2epub the DOM globals
+         (DOMParser, XMLSerializer, fetch, URL.createObjectURL) that the Chrome
+         MV3 service worker lacks. Created on demand via chrome.offscreen. -->
+    <script type="module" src="offscreen.js"></script>
+  </body>
+</html>

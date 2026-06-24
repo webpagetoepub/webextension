@@ -4,7 +4,8 @@ import browser from "./browser";
 // reserved characters), collapsed to a single hyphen.
 const ILLEGAL_FILENAME_CHARS = /[\\/:*?"<>|]+/g;
 
-function toEpubFilename(title: string): string {
+/** Build a safe `<title>.epub` download filename from a document title. */
+export function toEpubFilename(title: string): string {
   const base = title
     .trim()
     .replace(ILLEGAL_FILENAME_CHARS, "-")
@@ -12,11 +13,14 @@ function toEpubFilename(title: string): string {
   return `${base || "page"}.epub`;
 }
 
-// Revoke the object URL only once the download has reached a terminal state, so
-// we never pull the blob out from under an in-flight write.
-function revokeWhenDownloadSettles(
+/**
+ * Invoke `onSettled` once the download reaches a terminal state, then stop
+ * listening. Lets callers free the backing blob only after the bytes are
+ * written, so we never pull data out from under an in-flight download.
+ */
+export function onDownloadSettled(
   downloadId: number,
-  objectUrl: string,
+  onSettled: () => void,
 ): void {
   const onChanged = (delta: browser.Downloads.OnChangedDownloadDeltaType) => {
     if (delta.id !== downloadId || !delta.state) {
@@ -26,15 +30,42 @@ function revokeWhenDownloadSettles(
       delta.state.current === "complete" ||
       delta.state.current === "interrupted"
     ) {
-      URL.revokeObjectURL(objectUrl);
       browser.downloads.onChanged.removeListener(onChanged);
+      onSettled();
     }
   };
   browser.downloads.onChanged.addListener(onChanged);
 }
 
 /**
- * Save an EPUB blob to the user's Downloads folder.
+ * Start a download from an already-created blob URL and revoke that URL once the
+ * download settles. Used by the Chrome service worker, which cannot create blob
+ * URLs itself — the offscreen document creates one and the service worker only
+ * needs the string. The blob's owning context must stay alive until settle.
+ *
+ * @example
+ *   await downloadFromBlobUrl(blobUrl, 'My Article', () => closeOffscreen());
+ */
+export async function downloadFromBlobUrl(
+  blobUrl: string,
+  title: string,
+  onSettled: () => void,
+): Promise<number> {
+  const downloadId = await browser.downloads.download({
+    url: blobUrl,
+    filename: toEpubFilename(title),
+    saveAs: false,
+  });
+
+  onDownloadSettled(downloadId, onSettled);
+
+  return downloadId;
+}
+
+/**
+ * Save an EPUB blob to the user's Downloads folder. Runs in a context that owns
+ * the blob (the popup, or the Firefox background page), creating and revoking the
+ * object URL itself.
  *
  * @example
  *   await downloadEpub(epubBlob, 'My Article');
@@ -44,13 +75,7 @@ export default async function downloadEpub(
   title: string,
 ): Promise<number> {
   const objectUrl = URL.createObjectURL(epub);
-  const downloadId = await browser.downloads.download({
-    url: objectUrl,
-    filename: toEpubFilename(title),
-    saveAs: false,
-  });
-
-  revokeWhenDownloadSettles(downloadId, objectUrl);
-
-  return downloadId;
+  return downloadFromBlobUrl(objectUrl, title, () =>
+    URL.revokeObjectURL(objectUrl),
+  );
 }

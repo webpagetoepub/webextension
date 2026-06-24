@@ -6,23 +6,29 @@ Browser extension for Chrome and Firefox that converts the current web page into
 
 - **Language**: TypeScript, compiled to JavaScript for browser execution.
 - **Framework**: None. Vanilla web extension APIs + a hand-written `manifest.json`. No WXT/Plasmo/CRXJS.
-- **Manifest**: Manifest V3. A single shared `manifest.json` source is used, with browser-specific tweaks (e.g. `browser_specific_settings` for Firefox) applied at build time. No background/service worker key — MV3 allows extensions without one.
-- **Bundler**: esbuild. Bundles `src/popup/popup.ts` and inlines `html2epub` so everything runs browser-side. No remote code, no backend.
+- **Manifest**: Manifest V3. A single shared `manifest.json` source is used, with browser-specific tweaks applied at build time. The background is declared per browser: Chrome uses a `service_worker`, Firefox uses `background.scripts` (a background page). Chrome additionally holds the `offscreen` permission.
+- **Bundler**: esbuild. Bundles `src/popup/popup.ts`, `src/background/background.ts`, `src/offscreen/offscreen.ts` and inlines `html2epub` so everything runs browser-side. No remote code, no backend.
 
 ## Capabilities
 
-- **Trigger**: Toolbar popup button only. No context menu, no background script.
+- **Trigger**: Toolbar popup button. The popup is a thin trigger — it sends a `convert-active-tab` message to the background and the background does the work, so dismissing the popup no longer aborts conversion.
 - **Content extraction**: The active tab's live DOM is read on demand via `chrome.scripting.executeScript` (injected function returning `document.documentElement.outerHTML`). The page is never refetched.
-- **Conversion**: `html2epub` runs entirely inside the popup page, which provides the DOM globals it requires (`DOMParser`, `XMLSerializer`, `fetch`, etc.). Cross-origin image fetching is covered by `host_permissions: ["<all_urls>"]`.
+- **Conversion**: `html2epub` needs DOM globals (`DOMParser`, `XMLSerializer`, `fetch`, …). It runs in the background context, which differs by browser:
+  - **Chrome**: the MV3 service worker has no DOM, so it spins up an **offscreen document** (`chrome.offscreen`, `src/offscreen/`) to convert and create the blob URL; the worker then triggers the download.
+  - **Firefox**: there is no offscreen API, but the background page has full DOM and API access, so it converts and downloads inline.
+  The split lives in `src/background/background.ts`, branching on `typeof document === "undefined"`. Cross-origin image fetching is covered by `host_permissions: ["<all_urls>"]`.
 - **Output**: The generated ePub is saved to the user's Downloads folder via `browser.downloads.download` (`webextension-polyfill` normalises the API across browsers).
 
 ## Layout
 
 ```
 src/
-  popup/           # popup UI (HTML + TS) — the only extension entry point
-  lib/             # shared helpers: browser shim, html2epub wrapper, logger, downloader
-  types/           # hand-written .d.ts stubs (html2epub, for typecheck only)
+  popup/           # popup UI (HTML + TS) — thin trigger that messages the background
+  background/      # background.ts — Chrome service worker / Firefox background page
+  offscreen/       # offscreen.html + .ts — Chrome-only hidden DOM host for html2epub
+  lib/             # shared helpers: browser shim, html2epub wrapper, logger, downloader,
+                   #   convert_via_offscreen (Chrome), messages (cross-context contracts)
+  types/           # hand-written .d.ts stubs (html2epub, chrome.offscreen; typecheck only)
   manifest/        # per-browser manifest fragments, merged at build time
     manifest.base.json
     manifest.chrome.json
@@ -51,16 +57,16 @@ tests/
 Playwright is the test runner. **Caveat: Playwright only supports loading unpacked extensions in Chromium** (via `chromium.launchPersistentContext` with `--disable-extensions-except` and `--load-extension`). Firefox extension loading is not supported by Playwright at this time, so Firefox tests are limited to manual verification or `web-ext run` smoke checks. Write the automated suite against the Chromium build and treat Firefox as a manual/CI smoke target.
 
 For Chromium tests:
-- A test-only build (`tests/helpers/build_test_extension.ts`) bundles the popup alongside a thin `harness.html` page that exposes `window.convertToEpubBytes(url, html)` — this avoids driving the real popup UI and returns raw bytes for structural assertions.
-- A trivial `background.js` is added to the test build only so that `context.serviceWorkers()` can discover the extension ID. It does nothing else.
-- Assertions use `fflate.unzipSync` to inspect the ePub archive structure in Node.
+- A test-only build (`tests/helpers/build_test_extension.ts`) bundles the production popup, background and offscreen scripts alongside a thin `harness.html` page that exposes `window.convertToEpubBytes(url, html)` and `window.convertAndDownload(url, html)` — this avoids driving the real popup UI and returns raw bytes / a download id for assertions. The real background service worker also serves as the `context.serviceWorkers()` id source.
+- **Caveat: cross-context runtime messaging does not work in this headless harness** (verified: page↔service-worker `chrome.runtime.sendMessage` never settles). So the popup → service worker → offscreen message hops cannot be exercised end-to-end here; they are thin, type-guarded passthroughs. Tests instead call the production library functions (`convert_page_to_epub`, `download_epub`) directly in a real extension page.
+- Assertions use `fflate.unzipSync` to inspect the ePub archive structure in Node; the download path is checked by polling `chrome.downloads.search` for a `complete` state (Playwright captures the file under its artifacts dir with a generated name, so assert state, not the on-disk filename).
 
 ## Conventions
 
-- Use `chrome.*` only behind `src/lib/browser.ts` (re-exports `webextension-polyfill`) so the same code works on Firefox.
+- Use `chrome.*` only behind `src/lib/browser.ts` (re-exports `webextension-polyfill`) so the same code works on Firefox. The one exception is `chrome.offscreen` (Chrome-only, absent from the polyfill), used solely in `src/lib/convert_via_offscreen.ts` behind the service-worker branch.
 - Keep `html2epub` invocation in `src/lib/convert_page_to_epub.ts` — the single conversion entry point.
 - Never fetch remote scripts at runtime (MV3 forbids it and Firefox AMO rejects it).
-- The popup must stay open during conversion; closing it aborts the in-flight `html2epub` call.
+- Conversion runs in the background, not the popup, so the popup may be closed mid-conversion without aborting it. Cross-context message shapes live in `src/lib/messages.ts`.
 
 ## Code style
 

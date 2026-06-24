@@ -1,10 +1,14 @@
-import serializeActiveTab from "../lib/serialize_active_tab";
-import convertPageToEpub from "../lib/convert_page_to_epub";
-import downloadEpub from "../lib/download_epub";
+import browser from "../lib/browser";
+import {
+  ConvertActiveTabMessage,
+  ConvertResponse,
+  isFailure,
+} from "../lib/messages";
 
-// The popup window hosts the conversion, so it must stay open until the download
-// starts — closing it tears down the in-flight work. We reflect progress in the
-// button/status instead of auto-closing.
+// The popup is now a thin trigger: it hands the work to the background context
+// (Chrome service worker / Firefox background page), which converts and saves
+// independently. So closing the popup mid-conversion no longer aborts it — the
+// download still completes. If the popup is still open we reflect the result.
 
 function requireElement<T extends HTMLElement>(id: string): T {
   const element = document.getElementById(id);
@@ -24,14 +28,17 @@ function setStatus(message: string, isError = false): void {
 
 async function convertActivePage(): Promise<void> {
   button.disabled = true;
-  setStatus("Reading page…");
+  setStatus("Converting to ePub…");
 
   try {
-    const { url, html } = await serializeActiveTab();
-    setStatus("Converting to ePub…");
-    const { title, epub } = await convertPageToEpub(url, html);
-    await downloadEpub(epub, title);
-    setStatus(`Saved “${title}”.`);
+    const message: ConvertActiveTabMessage = { type: "convert-active-tab" };
+    const response = (await browser.runtime.sendMessage(
+      message,
+    )) as ConvertResponse;
+    if (isFailure(response)) {
+      throw new Error(response.error);
+    }
+    setStatus(`Saved “${response.title}”.`);
   } catch (error) {
     setStatus(error instanceof Error ? error.message : String(error), true);
   } finally {

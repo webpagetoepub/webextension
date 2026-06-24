@@ -10,19 +10,30 @@ type Browser = (typeof ALL_BROWSERS)[number];
 
 // esbuild targets per browser. html2epub ships raw TS and imports a .png as a
 // data URL (node_modules/html2epub/src/load_images.ts), so we transpile deps and
-// map .png -> dataurl. Output is ESM because popup.html loads popup.js as a module.
+// map .png -> dataurl. Output is ESM because the HTML pages and the (module-type)
+// background load their scripts as modules.
 function buildTargets(browser: Browser): string[] {
   return browser === "firefox" ? ["firefox115"] : ["chrome111"];
 }
 
-async function bundlePopup(browser: Browser, outDir: string): Promise<void> {
+// All extension entry points. background runs on both browsers (Chrome service
+// worker / Firefox background page); offscreen is only loaded on Chrome but is
+// harmless to ship to Firefox, which never references it.
+async function bundleEntryPoints(
+  browser: Browser,
+  outDir: string,
+): Promise<void> {
   await esbuild.build({
-    entryPoints: [join(root, "src/popup/popup.ts")],
+    entryPoints: {
+      popup: join(root, "src/popup/popup.ts"),
+      background: join(root, "src/background/background.ts"),
+      offscreen: join(root, "src/offscreen/offscreen.ts"),
+    },
     bundle: true,
     format: "esm",
     target: buildTargets(browser),
     loader: { ".png": "dataurl" },
-    outfile: join(outDir, "popup.js"),
+    outdir: outDir,
     logLevel: "info",
   });
 }
@@ -42,10 +53,14 @@ async function buildBrowser(browser: Browser): Promise<void> {
   await rm(outDir, { recursive: true, force: true });
   await mkdir(outDir, { recursive: true });
 
-  await bundlePopup(browser, outDir);
+  await bundleEntryPoints(browser, outDir);
   await copyFile(
     join(root, "src/popup/popup.html"),
     join(outDir, "popup.html"),
+  );
+  await copyFile(
+    join(root, "src/offscreen/offscreen.html"),
+    join(outDir, "offscreen.html"),
   );
   await copyIcons(outDir);
 
