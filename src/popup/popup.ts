@@ -26,9 +26,18 @@ function setStatus(message: string, isError = false): void {
   status.classList.toggle("error", isError);
 }
 
+async function activeTabTitle(): Promise<string | undefined> {
+  const [tab] = await browser.tabs.query({
+    active: true,
+    currentWindow: true,
+  });
+  return tab?.title;
+}
+
 async function convertActivePage(): Promise<void> {
   button.disabled = true;
-  setStatus("Converting to ePub…");
+  const title = await activeTabTitle();
+  setStatus(title ? `Converting “${title}” to ePub…` : "Converting to ePub…");
 
   try {
     const message: ConvertActiveTabMessage = { type: "convert-active-tab" };
