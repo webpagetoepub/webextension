@@ -4,10 +4,10 @@ import loadFirefoxExtension, {
 } from "./helpers/load_firefox_extension";
 
 // Smoke coverage for the Firefox build: it must install into a real Firefox.
-// The conversion flow is not exercised here (Firefox conversion is known to be
-// broken); this only guarantees the manifest + bundled scripts load as an
-// add-on, which Playwright cannot check because it loads extensions in Chromium
-// only. Driving Firefox needs geckodriver, so building + launching is slow.
+// This only guarantees the manifest + bundled scripts load as an add-on, which
+// Playwright cannot check because it loads extensions in Chromium only;
+// conversion itself is covered by firefox_converts_page.spec.ts. Driving Firefox
+// needs geckodriver, so building + launching is slow.
 test.describe.configure({ timeout: 120_000 });
 
 let extension: LoadedFirefoxExtension;

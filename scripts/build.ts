@@ -3,6 +3,7 @@ import { fileURLToPath } from "node:url";
 import { dirname, join } from "node:path";
 import * as esbuild from "esbuild";
 import mergeManifest from "./merge_manifest";
+import fflateMainThreadPlugin from "./fflate_main_thread_plugin";
 
 const root = join(dirname(fileURLToPath(import.meta.url)), "..");
 const ALL_BROWSERS = ["chrome", "firefox"] as const;
@@ -33,6 +34,7 @@ async function bundleEntryPoints(
     format: "esm",
     target: buildTargets(browser),
     loader: { ".png": "dataurl" },
+    plugins: [fflateMainThreadPlugin()],
     outdir: outDir,
     logLevel: "info",
   });

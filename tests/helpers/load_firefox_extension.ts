@@ -7,6 +7,7 @@ import { zipSync } from "fflate";
 import { Builder, WebDriver } from "selenium-webdriver";
 import firefox from "selenium-webdriver/firefox.js";
 import { download } from "geckodriver";
+import mergeManifest from "../../scripts/merge_manifest";
 
 // Firefox extension coverage. Playwright can only load unpacked extensions in
 // Chromium (see launch_extension.ts), so the Firefox build is exercised through
@@ -34,6 +35,22 @@ export interface LoadedFirefoxExtension {
   addonId: string;
 }
 
+export interface LoadFirefoxExtensionOptions {
+  // Pin the moz-extension:// host UUID so tests can navigate to a known
+  // extension page (e.g. moz-extension://<uuid>/harness.html). Firefox otherwise
+  // assigns a fresh random UUID per profile, which is unknowable ahead of time.
+  uuid?: string;
+  // Build the unpacked extension dir to package, overriding the default
+  // production `dist/firefox` build. The conversion spec passes the test build
+  // (with the harness page) so it can run the real conversion in an extension
+  // page; the loads spec leaves it undefined to exercise the shipped build.
+  buildExtension?: () => Promise<string>;
+  // Extra Firefox prefs (about:config) to set before launch. The conversion
+  // spec pins the MV3 base CSP here so the blob-worker block reproduces on any
+  // Firefox version, not just ones that still enforce the strict default.
+  prefs?: Record<string, string | number | boolean>;
+}
+
 // Recursively read a built extension dir into the flat { "path/in/zip": bytes }
 // map fflate expects, normalising separators to the forward slashes a zip uses.
 async function collectFiles(
@@ -54,9 +71,15 @@ async function collectFiles(
   return files;
 }
 
-async function packFirefoxXpi(): Promise<string> {
+// Default build: the shipped Firefox target. Returns the unpacked dist dir.
+async function buildProductionFirefox(): Promise<string> {
   execFileSync("npm", ["run", "build:firefox"], { cwd: root, stdio: "pipe" });
-  const archive = zipSync(await collectFiles(firefoxDist));
+  return firefoxDist;
+}
+
+// Zip an unpacked extension dir into an unsigned .xpi for temporary install.
+async function packXpi(extensionDir: string): Promise<string> {
+  const archive = zipSync(await collectFiles(extensionDir));
   const outDir = await mkdtemp(join(tmpdir(), "webpage2epub-xpi-"));
   const xpiPath = join(outDir, "webpage2epub.xpi");
   await writeFile(xpiPath, archive);
@@ -65,18 +88,37 @@ async function packFirefoxXpi(): Promise<string> {
 
 // Build the Firefox target, launch a headless Firefox via geckodriver, and
 // install the build as a temporary add-on. The caller owns driver.quit().
-export default async function loadFirefoxExtension(): Promise<LoadedFirefoxExtension> {
-  const xpiPath = await packFirefoxXpi();
+export default async function loadFirefoxExtension(
+  options: LoadFirefoxExtensionOptions = {},
+): Promise<LoadedFirefoxExtension> {
+  const buildExtension = options.buildExtension ?? buildProductionFirefox;
+  const xpiPath = await packXpi(await buildExtension());
   const geckodriverPath = await download(
     process.env.GECKODRIVER_VERSION,
     geckodriverCacheDir,
   );
 
-  const options = new firefox.Options().addArguments("-headless");
+  const firefoxOptions = new firefox.Options().addArguments("-headless");
+  for (const [key, value] of Object.entries(options.prefs ?? {})) {
+    firefoxOptions.setPreference(key, value);
+  }
+  // Pin moz-extension://<uuid> for the add-on id so the harness page has a
+  // stable URL. The pref must be set before install — Firefox assigns the UUID
+  // on first install and reuses the pre-seeded mapping if present.
+  if (options.uuid) {
+    const { browser_specific_settings } = await mergeManifest("firefox");
+    const addonId = (browser_specific_settings as { gecko: { id: string } })
+      .gecko.id;
+    firefoxOptions.setPreference(
+      "extensions.webextensions.uuids",
+      JSON.stringify({ [addonId]: options.uuid }),
+    );
+  }
+
   const service = new firefox.ServiceBuilder(geckodriverPath);
   const driver = await new Builder()
     .forBrowser("firefox")
-    .setFirefoxOptions(options)
+    .setFirefoxOptions(firefoxOptions)
     .setFirefoxService(service)
     .build();
 
