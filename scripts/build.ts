@@ -38,6 +38,12 @@ async function bundleEntryPoints(
   await esbuild.build({
     entryPoints: entryPoints(browser),
     bundle: true,
+    // Split shared deps (html2epub, fflate, the polyfill) into chunk files so
+    // they are stored once instead of being inlined into every entry point.
+    // Works because all entries load as ESM modules: Chrome's service_worker and
+    // Firefox's background.scripts are both manifest "type": "module", and the
+    // HTML pages load their scripts as modules.
+    splitting: true,
     format: "esm",
     target: buildTargets(browser),
     loader: { ".png": "dataurl" },
