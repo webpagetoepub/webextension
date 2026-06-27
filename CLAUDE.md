@@ -54,7 +54,14 @@ tests/
 
 ## Testing
 
-Playwright is the test runner. **Caveat: Playwright only supports loading unpacked extensions in Chromium** (via `chromium.launchPersistentContext` with `--disable-extensions-except` and `--load-extension`). Firefox extension loading is not supported by Playwright at this time, so Firefox tests are limited to manual verification or `web-ext run` smoke checks. Write the automated suite against the Chromium build and treat Firefox as a manual/CI smoke target.
+Playwright is the test runner. **Caveat: Playwright only supports loading unpacked extensions in Chromium** (via `chromium.launchPersistentContext` with `--disable-extensions-except` and `--load-extension`). So the conversion/download suite is Chromium-only. Firefox gets a separate, narrower automated check driven through geckodriver (see below); both live under `tests/` and run from the single `npm test`.
+
+For Firefox (`tests/firefox_extension_loads.spec.ts`):
+- Playwright cannot load a Firefox extension, so the spec drives a real Firefox through **geckodriver** (the Marionette/WebDriver path, same as `web-ext run`). `tests/helpers/load_firefox_extension.ts` builds `dist/firefox`, zips it into an `.xpi` with `fflate`, downloads the geckodriver binary via the `geckodriver` package, then `installAddon(xpi, /* temporary */ true)` installs it unsigned.
+- **Scope: this only asserts the build *loads* as a temporary add-on** (the resolved add-on id equals `browser_specific_settings.gecko.id`). It does not exercise conversion — Firefox conversion is currently broken, and this guards against manifest/bundle regressions that would stop the extension loading at all.
+- Requires a system Firefox. The geckodriver binary is downloaded once into `node_modules/.cache/geckodriver` (git-ignored) and reused; only the first run needs network. Override the location with `GECKODRIVER_CACHE_DIR` or pin the version with `GECKODRIVER_VERSION` for offline/CI.
+
+For Chromium tests:
 
 For Chromium tests:
 - A test-only build (`tests/helpers/build_test_extension.ts`) bundles the production popup, background and offscreen scripts alongside a thin `harness.html` page that exposes `window.convertToEpubBytes(url, html)` and `window.convertAndDownload(url, html)` — this avoids driving the real popup UI and returns raw bytes / a download id for assertions. The real background service worker also serves as the `context.serviceWorkers()` id source.
