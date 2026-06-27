@@ -1,14 +1,17 @@
 import browser from "../lib/browser";
 import {
+  ConversionStatus,
   ConvertActiveTabMessage,
-  ConvertResponse,
-  isFailure,
+  GetConversionStatusMessage,
+  StatusUpdateMessage,
 } from "../lib/messages";
+import statusView from "./status_view";
 
-// The popup is now a thin trigger: it hands the work to the background context
-// (Chrome service worker / Firefox background page), which converts and saves
-// independently. So closing the popup mid-conversion no longer aborts it — the
-// download still completes. If the popup is still open we reflect the result.
+// The popup is a passive view over the background's conversion status. The
+// background owns the work and broadcasts every status change, so the popup
+// shows progress no matter which trigger started it — the toolbar button or the
+// page context menu (which opens this popup via chrome.action.openPopup). Closing
+// the popup mid-conversion no longer aborts it; the download still completes.
 
 function requireElement<T extends HTMLElement>(id: string): T {
   const element = document.getElementById(id);
@@ -21,38 +24,47 @@ function requireElement<T extends HTMLElement>(id: string): T {
 const button = requireElement<HTMLButtonElement>("convert");
 const status = requireElement<HTMLParagraphElement>("status");
 
-function setStatus(message: string, isError = false): void {
-  status.textContent = message;
-  status.classList.toggle("error", isError);
+function render(state: ConversionStatus): void {
+  const view = statusView(state);
+  status.textContent = view.text;
+  status.classList.toggle("error", view.isError);
+  button.disabled = view.busy;
 }
 
-async function activeTabTitle(): Promise<string | undefined> {
-  const [tab] = await browser.tabs.query({
-    active: true,
-    currentWindow: true,
-  });
-  return tab?.title;
+function startConversion(): void {
+  const message: ConvertActiveTabMessage = { type: "convert-active-tab" };
+  // Fire and forget: the UI is driven by status-update broadcasts, and the
+  // background keeps converting even if this popup closes.
+  void browser.runtime.sendMessage(message).catch(() => undefined);
 }
 
-async function convertActivePage(): Promise<void> {
-  button.disabled = true;
-  const title = await activeTabTitle();
-  setStatus(title ? `Converting “${title}” to ePub…` : "Converting to ePub…");
+function isStatusUpdate(message: unknown): message is StatusUpdateMessage {
+  return (
+    typeof message === "object" &&
+    message !== null &&
+    (message as { type?: unknown }).type === "status-update"
+  );
+}
 
-  try {
-    const message: ConvertActiveTabMessage = { type: "convert-active-tab" };
-    const response = (await browser.runtime.sendMessage(
-      message,
-    )) as ConvertResponse;
-    if (isFailure(response)) {
-      throw new Error(response.error);
-    }
-    setStatus(`Saved “${response.title}”.`);
-  } catch (error) {
-    setStatus(error instanceof Error ? error.message : String(error), true);
-  } finally {
-    button.disabled = false;
+// A popup opened from the context menu may miss the "converting" broadcast that
+// fired before its listener was ready, so it asks the background for the current
+// status on load to catch up.
+async function showCurrentStatus(): Promise<void> {
+  const query: GetConversionStatusMessage = { type: "get-conversion-status" };
+  const snapshot = (await browser.runtime.sendMessage(query)) as
+    | ConversionStatus
+    | undefined;
+  if (snapshot) {
+    render(snapshot);
   }
 }
 
-button.addEventListener("click", convertActivePage);
+browser.runtime.onMessage.addListener((message: unknown) => {
+  if (isStatusUpdate(message)) {
+    render(message.status);
+  }
+  return undefined;
+});
+
+button.addEventListener("click", startConversion);
+void showCurrentStatus();

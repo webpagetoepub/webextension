@@ -1,6 +1,6 @@
 {
   "minimum_chrome_version": "111",
-  "permissions": ["scripting", "downloads", "offscreen"],
+  "permissions": ["scripting", "downloads", "offscreen", "contextMenus"],
   "background": {
     "service_worker": "background.js",
     "type": "module"

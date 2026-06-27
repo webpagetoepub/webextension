@@ -11,7 +11,8 @@ Browser extension for Chrome and Firefox that converts the current web page into
 
 ## Capabilities
 
-- **Trigger**: Toolbar popup button. The popup is a thin trigger — it sends a `convert-active-tab` message to the background and the background does the work, so dismissing the popup no longer aborts conversion.
+- **Trigger**: Toolbar popup button, or a "Save page as ePub" **page context-menu** entry (`contextMenus` permission). Both send a `convert-active-tab` message / call `convertActiveTab` in the background, which does the work, so dismissing the popup no longer aborts conversion. The context-menu entry is registered in `background.ts` (`contextMenus.onClicked`) and additionally calls `chrome.action.openPopup()` so the popup opens and shows progress (best-effort: needs Chrome 127+ / a Firefox user gesture; conversion runs regardless).
+- **Progress reporting**: The background owns conversion status (`ConversionStatus` in `src/lib/messages.ts`) so the popup shows progress no matter which trigger started the work. It broadcasts a `status-update` on every transition (idle → converting → done/error), and a freshly opened popup catches up via a `get-conversion-status` query. The popup is a passive view: `src/popup/status_view.ts` is the pure status→UI mapping (unit-tested in `tests/status_view.spec.ts`), and `popup.ts` just renders it and fires `convert-active-tab` on the button click.
 - **Content extraction**: The active tab's live DOM is read on demand via `chrome.scripting.executeScript` (injected function returning `document.documentElement.outerHTML`). The page is never refetched.
 - **Conversion**: `html2epub` needs DOM globals (`DOMParser`, `XMLSerializer`, `fetch`, …). It runs in the background context, which differs by browser:
   - **Chrome**: the MV3 service worker has no DOM, so it spins up an **offscreen document** (`chrome.offscreen`, `src/offscreen/`) to convert and create the blob URL; the worker then triggers the download.

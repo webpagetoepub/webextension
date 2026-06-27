@@ -6,9 +6,32 @@
 // Conversion runs in the background instead of the popup so that dismissing the
 // popup no longer aborts the in-flight html2epub work (see CLAUDE.md).
 
-/** popup -> background: convert the active tab and save the ePub. */
+/** popup or context menu -> background: convert the active tab and save it. */
 export interface ConvertActiveTabMessage {
   type: "convert-active-tab";
+}
+
+/** popup -> background: what is the conversion doing right now? */
+export interface GetConversionStatusMessage {
+  type: "get-conversion-status";
+}
+
+/**
+ * The background owns conversion progress and shares it as one of these states.
+ * A popup opened from the context menu (which it didn't trigger) reads the
+ * current state on load; every transition is also broadcast (StatusUpdateMessage)
+ * so an already-open popup updates live.
+ */
+export type ConversionStatus =
+  | { state: "idle" }
+  | { state: "converting"; title?: string }
+  | { state: "done"; title: string }
+  | { state: "error"; message: string };
+
+/** background -> popup (broadcast): the conversion status changed. */
+export interface StatusUpdateMessage {
+  type: "status-update";
+  status: ConversionStatus;
 }
 
 /** background -> offscreen (Chrome only): convert this page's HTML to an ePub. */
@@ -16,11 +39,6 @@ export interface OffscreenConvertMessage {
   type: "offscreen-convert";
   url: string;
   html: string;
-}
-
-/** background -> popup: conversion finished and the download was started. */
-export interface ConvertSucceeded {
-  title: string;
 }
 
 /** offscreen -> background: the ePub blob URL plus its document title. */
@@ -34,7 +52,6 @@ export interface OperationFailed {
   error: string;
 }
 
-export type ConvertResponse = ConvertSucceeded | OperationFailed;
 export type OffscreenConvertResponse =
   | OffscreenConvertSucceeded
   | OperationFailed;
