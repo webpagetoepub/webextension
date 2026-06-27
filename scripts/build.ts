@@ -18,18 +18,25 @@ function buildTargets(browser: Browser): string[] {
 }
 
 // All extension entry points. background runs on both browsers (Chrome service
-// worker / Firefox background page); offscreen is only loaded on Chrome but is
-// harmless to ship to Firefox, which never references it.
+// worker / Firefox background page); offscreen is Chrome-only and gated out of
+// the Firefox build, which never references it (no manifest entry, inline path).
+function entryPoints(browser: Browser): Record<string, string> {
+  const entries: Record<string, string> = {
+    popup: join(root, "src/popup/popup.ts"),
+    background: join(root, "src/background/background.ts"),
+  };
+  if (browser === "chrome") {
+    entries.offscreen = join(root, "src/offscreen/offscreen.ts");
+  }
+  return entries;
+}
+
 async function bundleEntryPoints(
   browser: Browser,
   outDir: string,
 ): Promise<void> {
   await esbuild.build({
-    entryPoints: {
-      popup: join(root, "src/popup/popup.ts"),
-      background: join(root, "src/background/background.ts"),
-      offscreen: join(root, "src/offscreen/offscreen.ts"),
-    },
+    entryPoints: entryPoints(browser),
     bundle: true,
     format: "esm",
     target: buildTargets(browser),
@@ -60,10 +67,14 @@ async function buildBrowser(browser: Browser): Promise<void> {
     join(root, "src/popup/popup.html"),
     join(outDir, "popup.html"),
   );
-  await copyFile(
-    join(root, "src/offscreen/offscreen.html"),
-    join(outDir, "offscreen.html"),
-  );
+  // offscreen.html hosts the Chrome-only offscreen document; Firefox never loads
+  // it, so it is gated out of the Firefox build alongside its bundle.
+  if (browser === "chrome") {
+    await copyFile(
+      join(root, "src/offscreen/offscreen.html"),
+      join(outDir, "offscreen.html"),
+    );
+  }
   await copyIcons(outDir);
 
   const manifest = await mergeManifest(browser);
