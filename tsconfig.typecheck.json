@@ -1,0 +1,9 @@
+{
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "baseUrl": ".",
+    "paths": {
+      "html2epub": ["./src/types/html2epub.d.ts"]
+    }
+  }
+}
