@@ -20,12 +20,10 @@ be packaged into the file; that is the only network access the extension makes.
 
 ## Install
 
-> Store listings are not published yet.
-
-- Chrome Web Store — _coming soon_
+- [Chrome Web Store](https://chromewebstore.google.com/detail/kffcfgcpknijgfoecbefglmemkpkgokg?utm_source=item-share-cb)
 - Firefox Add-ons (AMO) — _coming soon_
 
-Until then, build it yourself and load it unpacked (see below).
+You can also build it yourself and load it unpacked (see below).
 
 ## Build from source
 
