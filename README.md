@@ -20,8 +20,8 @@ be packaged into the file; that is the only network access the extension makes.
 
 ## Install
 
-- [Chrome Web Store](https://chromewebstore.google.com/detail/kffcfgcpknijgfoecbefglmemkpkgokg?utm_source=item-share-cb)
-- [Firefox Browser Add-ons](https://addons.mozilla.org/pt-BR/firefox/addon/webpage-to-epub/)
+- [Chrome Web Store](https://chromewebstore.google.com/detail/webpage-to-epub/kffcfgcpknijgfoecbefglmemkpkgokg)
+- [Firefox Browser Add-ons](https://addons.mozilla.org/firefox/addon/webpage-to-epub/)
 
 You can also build it yourself and load it unpacked (see below).
 
