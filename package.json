@@ -1,6 +1,6 @@
 {
   "name": "webpage2epub-webextension",
-  "version": "0.0.1",
+  "version": "0.1.0",
   "description": "Convert webpage to EPUB",
   "keywords": [
     "epub",
@@ -22,7 +22,7 @@
     "test": "playwright test"
   },
   "dependencies": {
-    "html2epub": "github:webpagetoepub/html2epub#8625f81278045786214b9511d6a4be7908e7ae9e",
+    "html2epub": "github:webpagetoepub/html2epub#665e733f080af8e5526a07eae6303c202f7a26ad",
     "webextension-polyfill": "^0.12.0"
   },
   "devDependencies": {
