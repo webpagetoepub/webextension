@@ -34,10 +34,17 @@ export default async function buildTestExtension(
   }
   const outDir = await mkdtemp(join(tmpdir(), "webpage2epub-ext-"));
 
+  // Mirror the production build: pick the per-browser background entry, emitted
+  // as background.js via the shared object key so the manifest matches.
+  const backgroundEntry =
+    browser === "firefox"
+      ? "src/background/background.firefox.ts"
+      : "src/background/background.chrome.ts";
+
   await esbuild.build({
     entryPoints: {
       popup: join(root, "src/popup/popup.ts"),
-      background: join(root, "src/background/background.ts"),
+      background: join(root, backgroundEntry),
       offscreen: join(root, "src/offscreen/offscreen.ts"),
       harness: join(root, "tests/harness/harness.ts"),
     },
