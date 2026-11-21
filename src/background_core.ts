@@ -106,18 +106,30 @@ function openPopupForProgress(): void {
   void browser.action.openPopup?.().catch(() => undefined);
 }
 
+// Starts a conversion of the active tab. Status-managed and drops a re-entrant
+// call while one is in flight (see convertActiveTab). Returned by registerBackground
+// so a per-browser entry can wire its own extra trigger — the Firefox toolbar tap
+// (src/firefox/background.firefox.ts) uses it for Fenix, where the tap is the only UI.
+export type StartConversion = () => void;
+
 /**
- * Wire up the background for one browser: the message listeners, the page
- * context menu, and the triggers that start a conversion. All registration runs
- * synchronously so an MV3 worker wake-up finds the onMessage listener already
- * attached. The browser-specific convert+download step is injected.
+ * Wire up the browser-agnostic background: the message listeners and the page
+ * context menu, returning the trigger that starts a conversion. All registration
+ * runs synchronously so an MV3 worker wake-up finds the onMessage listener already
+ * attached. The browser-specific convert+download step is injected, and the
+ * returned trigger lets an entry add browser-specific triggers (e.g. the Firefox
+ * toolbar tap); Chrome relies only on the popup + context menu and ignores it.
  *
  * @example
  *   registerBackground(convertInOffscreenAndDownload); // Chrome entry
  */
 export default function registerBackground(
   convertAndDownload: ConvertAndDownload,
-): void {
+): StartConversion {
+  const startConversion: StartConversion = () => {
+    void convertActiveTab(convertAndDownload);
+  };
+
   browser.runtime.onMessage.addListener((message: unknown) => {
     if (isConvertActiveTab(message)) {
       // Returning the promise keeps the MV3 worker alive until conversion ends.
@@ -129,15 +141,22 @@ export default function registerBackground(
     return undefined; // not ours — e.g. the offscreen document's own messages
   });
 
+  // The page context menu doesn't exist on Firefox Android — browser.contextMenus
+  // is undefined there (not merely a no-op), so touching it throws — so only wire
+  // it where the API exists. See anonaddy/browser-extension#67.
+  if (!browser.contextMenus) {
+    return startConversion;
+  }
   browser.runtime.onInstalled.addListener(() => {
     void registerConvertMenu();
   });
-
   browser.contextMenus.onClicked.addListener((info) => {
     if (info.menuItemId !== CONVERT_MENU_ID) {
       return; // another extension's menu item shares this bus
     }
     openPopupForProgress();
-    void convertActiveTab(convertAndDownload);
+    startConversion();
   });
+
+  return startConversion;
 }

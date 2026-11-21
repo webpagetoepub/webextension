@@ -1,5 +1,8 @@
 import browser from "../lib/browser";
-import registerBackground, { ConvertAndDownload } from "../background_core";
+import registerBackground, {
+  ConvertAndDownload,
+  StartConversion,
+} from "../background_core";
 import convertPageToEpub from "../lib/convert_page_to_epub";
 import downloadEpub from "../lib/download_epub";
 import downloadEpubViaPage, {
@@ -48,4 +51,26 @@ const convertInlineAndDownload: ConvertAndDownload = async ({
   return title;
 };
 
-registerBackground(convertInlineAndDownload);
+// Firefox-only toolbar wiring (Chrome declares default_popup in its manifest and is
+// unaffected). The Firefox manifest omits default_popup because clearing it at
+// runtime via setPopup({popup:""}) opens a blank page on Fenix; instead we set it
+// here for desktop only, leaving Firefox Android with no popup so action.onClicked
+// fires and the tap converts directly — on Fenix that tap is the only UI (no context
+// menu, no popup). Pattern from MDN's bookmark-it example and the Mozilla Discourse
+// "browserAction popup on Firefox Android" thread.
+async function setDesktopPopup(): Promise<void> {
+  const { os } = await browser.runtime.getPlatformInfo();
+  if (os !== "android") {
+    await browser.action.setPopup({ popup: "popup.html" });
+  }
+}
+
+// No openPopupForProgress on tap: openPopup is a no-op on Android, and the saved file
+// landing in Fenix's Downloads menu is the feedback (a notifications toast is avoided —
+// unreliable on Android, needs a permission — for a sub-second task).
+function registerToolbarTap(startConversion: StartConversion): void {
+  browser.action.onClicked.addListener(startConversion);
+  void setDesktopPopup();
+}
+
+registerToolbarTap(registerBackground(convertInlineAndDownload));
