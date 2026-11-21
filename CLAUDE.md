@@ -27,17 +27,16 @@ src/
   popup/           # popup UI (HTML + TS) — thin trigger that messages the background
   background/      # background_core.ts — browser-agnostic orchestration both entries import
   chrome/          # Chrome-only code: background.chrome.ts entry, convert_via_offscreen.ts
-                   #   (worker-side offscreen client) + chrome_offscreen.d.ts, and
-                   #   offscreen/ (offscreen.html + .ts — hidden DOM host for html2epub)
+                   #   (worker-side offscreen client) + chrome_offscreen.d.ts,
+                   #   manifest.chrome.json, and offscreen/ (offscreen.html + .ts —
+                   #   hidden DOM host for html2epub)
   firefox/         # Firefox-only code: background.firefox.ts entry, download_via_page.ts
-                   #   (Fenix download fallback)
+                   #   (Fenix download fallback), manifest.firefox.json
   lib/             # shared helpers: browser shim, html2epub wrapper, logger, downloader,
                    #   messages (cross-context contracts)
   types/           # shared .d.ts stubs (html2epub; typecheck only)
-  manifest/        # per-browser manifest fragments, merged at build time
+  manifest/        # shared base manifest; browser fragments live in src/<browser>/
     manifest.base.json
-    manifest.chrome.json
-    manifest.firefox.json
 scripts/           # esbuild scripts that merge manifests and bundle src/
 dist/              # generated; git-ignored
   chrome/

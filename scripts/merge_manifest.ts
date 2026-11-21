@@ -5,12 +5,7 @@ import { dirname, join } from "node:path";
 type JsonValue = string | number | boolean | null | JsonValue[] | JsonObject;
 type JsonObject = { [key: string]: JsonValue };
 
-const manifestDir = join(
-  dirname(fileURLToPath(import.meta.url)),
-  "..",
-  "src",
-  "manifest",
-);
+const srcDir = join(dirname(fileURLToPath(import.meta.url)), "..", "src");
 
 function isPlainObject(value: JsonValue): value is JsonObject {
   return typeof value === "object" && value !== null && !Array.isArray(value);
@@ -29,17 +24,19 @@ function deepMerge(base: JsonValue, override: JsonValue): JsonValue {
   return merged;
 }
 
-async function readJson(name: string): Promise<JsonValue> {
-  return JSON.parse(
-    await readFile(join(manifestDir, name), "utf8"),
-  ) as JsonValue;
+async function readJson(path: string): Promise<JsonValue> {
+  return JSON.parse(await readFile(join(srcDir, path), "utf8")) as JsonValue;
 }
 
-/** Build the final manifest object for a target browser ('chrome' | 'firefox'). */
+/**
+ * Build the final manifest object for a target browser ('chrome' | 'firefox').
+ * The shared base lives in src/manifest/; each browser-specific override lives
+ * alongside that browser's code in src/<browser>/ (see the chrome/firefox split).
+ */
 export default async function mergeManifest(
   browser: string,
 ): Promise<JsonObject> {
-  const base = await readJson("manifest.base.json");
-  const override = await readJson(`manifest.${browser}.json`);
+  const base = await readJson("manifest/manifest.base.json");
+  const override = await readJson(`${browser}/manifest.${browser}.json`);
   return deepMerge(base, override) as JsonObject;
 }
