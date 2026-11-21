@@ -1,8 +1,10 @@
-import registerBackground, { ConvertAndDownload } from "./background_core";
+import registerBackground, {
+  ConvertAndDownload,
+} from "../background/background_core";
 import { downloadFromBlobUrl } from "../lib/download_epub";
 import convertViaOffscreen, {
   closeOffscreenDocument,
-} from "../lib/convert_via_offscreen";
+} from "./convert_via_offscreen";
 
 // Chrome entry point (MV3 service worker). The worker has no DOM, so html2epub
 // runs in an offscreen document: it converts and creates the blob URL, then the

@@ -1,10 +1,10 @@
-import browser from "./browser";
+import browser from "../lib/browser";
 import {
   OffscreenConvertMessage,
   OffscreenConvertResponse,
   OffscreenConvertSucceeded,
   isFailure,
-} from "./messages";
+} from "../lib/messages";
 
 // Chrome-only path: the MV3 service worker has no DOM, so it delegates html2epub
 // to an offscreen document. We use chrome.offscreen directly (it is Chrome-only

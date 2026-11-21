@@ -38,14 +38,14 @@ export default async function buildTestExtension(
   // as background.js via the shared object key so the manifest matches.
   const backgroundEntry =
     browser === "firefox"
-      ? "src/background/background.firefox.ts"
-      : "src/background/background.chrome.ts";
+      ? "src/firefox/background.firefox.ts"
+      : "src/chrome/background.chrome.ts";
 
   await esbuild.build({
     entryPoints: {
       popup: join(root, "src/popup/popup.ts"),
       background: join(root, backgroundEntry),
-      offscreen: join(root, "src/offscreen/offscreen.ts"),
+      offscreen: join(root, "src/chrome/offscreen/offscreen.ts"),
       harness: join(root, "tests/harness/harness.ts"),
     },
     bundle: true,
@@ -61,7 +61,7 @@ export default async function buildTestExtension(
     join(outDir, "popup.html"),
   );
   await copyFile(
-    join(root, "src/offscreen/offscreen.html"),
+    join(root, "src/chrome/offscreen/offscreen.html"),
     join(outDir, "offscreen.html"),
   );
   await copyFile(

@@ -1,9 +1,9 @@
-import browser from "../lib/browser";
-import convertPageToEpub from "../lib/convert_page_to_epub";
+import browser from "../../lib/browser";
+import convertPageToEpub from "../../lib/convert_page_to_epub";
 import {
   OffscreenConvertMessage,
   OffscreenConvertResponse,
-} from "../lib/messages";
+} from "../../lib/messages";
 
 // Runs in the Chrome offscreen document — a hidden full-DOM page the service
 // worker spins up so html2epub has the DOM globals the worker lacks. We convert

@@ -2,7 +2,7 @@ import { test, expect } from "@playwright/test";
 import {
   bytesToBase64,
   downloadsApiUnavailable,
-} from "../src/lib/download_via_page";
+} from "../src/firefox/download_via_page";
 
 // Pure helpers behind the Firefox Android download fallback. They carry the ePub
 // bytes into the active page (base64, because executeScript args are JSON-only)

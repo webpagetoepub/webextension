@@ -25,14 +25,14 @@ function buildTargets(browser: Browser): string[] {
 function entryPoints(browser: Browser): Record<string, string> {
   const backgroundEntry =
     browser === "firefox"
-      ? "src/background/background.firefox.ts"
-      : "src/background/background.chrome.ts";
+      ? "src/firefox/background.firefox.ts"
+      : "src/chrome/background.chrome.ts";
   const entries: Record<string, string> = {
     popup: join(root, "src/popup/popup.ts"),
     background: join(root, backgroundEntry),
   };
   if (browser === "chrome") {
-    entries.offscreen = join(root, "src/offscreen/offscreen.ts");
+    entries.offscreen = join(root, "src/chrome/offscreen/offscreen.ts");
   }
   return entries;
 }
@@ -83,7 +83,7 @@ async function buildBrowser(browser: Browser): Promise<void> {
   // it, so it is gated out of the Firefox build alongside its bundle.
   if (browser === "chrome") {
     await copyFile(
-      join(root, "src/offscreen/offscreen.html"),
+      join(root, "src/chrome/offscreen/offscreen.html"),
       join(outDir, "offscreen.html"),
     );
   }

@@ -101,10 +101,10 @@ export default async function downloadEpubViaPage(
 ): Promise<void> {
   // Deferred imports: webextension-polyfill throws at import time outside an
   // extension, so importing it lazily keeps this module (and its pure helpers)
-  // loadable and unit-testable in plain Node. Same pattern as background.ts.
+  // loadable and unit-testable in plain Node.
   const [{ default: browser }, { toEpubFilename }] = await Promise.all([
-    import("./browser"),
-    import("./download_epub"),
+    import("../lib/browser"),
+    import("../lib/download_epub"),
   ]);
   const bytes = new Uint8Array(await epub.arrayBuffer());
   const base64 = bytesToBase64(bytes);

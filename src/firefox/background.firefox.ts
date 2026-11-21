@@ -1,10 +1,12 @@
 import browser from "../lib/browser";
-import registerBackground, { ConvertAndDownload } from "./background_core";
+import registerBackground, {
+  ConvertAndDownload,
+} from "../background/background_core";
 import convertPageToEpub from "../lib/convert_page_to_epub";
 import downloadEpub from "../lib/download_epub";
 import downloadEpubViaPage, {
   downloadsApiUnavailable,
-} from "../lib/download_via_page";
+} from "./download_via_page";
 
 // Firefox entry point (background page). Unlike the Chrome service worker it has
 // full DOM + downloads API, so it converts and saves inline here. convert_page_to_epub
