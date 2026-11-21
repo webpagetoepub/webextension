@@ -3,7 +3,7 @@
   "compilerOptions": {
     "baseUrl": ".",
     "paths": {
-      "html2epub": ["./src/types/html2epub.d.ts"]
+      "html2epub": ["./src/html2epub.d.ts"]
     }
   }
 }

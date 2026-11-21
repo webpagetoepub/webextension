@@ -17,15 +17,17 @@ Browser extension for Chrome and Firefox that converts the current web page into
 - **Conversion**: `html2epub` needs DOM globals (`DOMParser`, `XMLSerializer`, `fetch`, …). It runs in the background context, which differs by browser:
   - **Chrome**: the MV3 service worker has no DOM, so it spins up an **offscreen document** (`chrome.offscreen`, `src/chrome/offscreen/`) to convert and create the blob URL; the worker then triggers the download.
   - **Firefox**: there is no offscreen API, but the background page has full DOM and API access, so it converts and downloads inline.
-  The split is structural, not a runtime branch: `src/background/background_core.ts` holds the browser-agnostic orchestration (status, message listeners, context menu) and takes the convert+download step as an injected `ConvertAndDownload` strategy; `src/chrome/background.chrome.ts` and `src/firefox/background.firefox.ts` are the per-browser entry points that supply their strategy (offscreen vs inline) and call `registerBackground`. The build points the `background` esbuild entry at the right source per browser (both emit `background.js`, so the manifests are unchanged). Cross-origin image fetching is covered by `host_permissions: ["<all_urls>"]`.
+  The split is structural, not a runtime branch: `src/background_core.ts` holds the browser-agnostic orchestration (status, message listeners, context menu) and takes the convert+download step as an injected `ConvertAndDownload` strategy; `src/chrome/background.chrome.ts` and `src/firefox/background.firefox.ts` are the per-browser entry points that supply their strategy (offscreen vs inline) and call `registerBackground`. The build points the `background` esbuild entry at the right source per browser (both emit `background.js`, so the manifests are unchanged). Cross-origin image fetching is covered by `host_permissions: ["<all_urls>"]`.
 - **Output**: The generated ePub is saved to the user's Downloads folder via `browser.downloads.download` (`webextension-polyfill` normalises the API across browsers).
 
 ## Layout
 
 ```
 src/
+  background_core.ts # browser-agnostic orchestration both entries import
+  html2epub.d.ts     # shared .d.ts stub (html2epub; typecheck only)
+  manifest.base.json # shared base manifest; browser fragments live in src/<browser>/
   popup/           # popup UI (HTML + TS) — thin trigger that messages the background
-  background/      # background_core.ts — browser-agnostic orchestration both entries import
   chrome/          # Chrome-only code: background.chrome.ts entry, convert_via_offscreen.ts
                    #   (worker-side offscreen client) + chrome_offscreen.d.ts,
                    #   manifest.chrome.json, and offscreen/ (offscreen.html + .ts —
@@ -34,9 +36,6 @@ src/
                    #   (Fenix download fallback), manifest.firefox.json
   lib/             # shared helpers: browser shim, html2epub wrapper, logger, downloader,
                    #   messages (cross-context contracts)
-  types/           # shared .d.ts stubs (html2epub; typecheck only)
-  manifest/        # shared base manifest; browser fragments live in src/<browser>/
-    manifest.base.json
 scripts/           # esbuild scripts that merge manifests and bundle src/
 dist/              # generated; git-ignored
   chrome/

@@ -1,7 +1,5 @@
 import browser from "../lib/browser";
-import registerBackground, {
-  ConvertAndDownload,
-} from "../background/background_core";
+import registerBackground, { ConvertAndDownload } from "../background_core";
 import convertPageToEpub from "../lib/convert_page_to_epub";
 import downloadEpub from "../lib/download_epub";
 import downloadEpubViaPage, {

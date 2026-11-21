@@ -1,13 +1,11 @@
-import browser from "../lib/browser";
-import serializeActiveTab, {
-  SerializedPage,
-} from "../lib/serialize_active_tab";
+import browser from "./lib/browser";
+import serializeActiveTab, { SerializedPage } from "./lib/serialize_active_tab";
 import {
   ConversionStatus,
   ConvertActiveTabMessage,
   GetConversionStatusMessage,
   StatusUpdateMessage,
-} from "../lib/messages";
+} from "./lib/messages";
 
 // Browser-agnostic background orchestration. Owns conversion status, the two
 // triggers (popup button + page context menu) and the context menu itself, and

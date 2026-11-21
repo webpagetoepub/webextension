@@ -1,6 +1,4 @@
-import registerBackground, {
-  ConvertAndDownload,
-} from "../background/background_core";
+import registerBackground, { ConvertAndDownload } from "../background_core";
 import { downloadFromBlobUrl } from "../lib/download_epub";
 import convertViaOffscreen, {
   closeOffscreenDocument,

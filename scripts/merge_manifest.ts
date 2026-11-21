@@ -30,13 +30,13 @@ async function readJson(path: string): Promise<JsonValue> {
 
 /**
  * Build the final manifest object for a target browser ('chrome' | 'firefox').
- * The shared base lives in src/manifest/; each browser-specific override lives
+ * The shared base lives in src/; each browser-specific override lives
  * alongside that browser's code in src/<browser>/ (see the chrome/firefox split).
  */
 export default async function mergeManifest(
   browser: string,
 ): Promise<JsonObject> {
-  const base = await readJson("manifest/manifest.base.json");
+  const base = await readJson("manifest.base.json");
   const override = await readJson(`${browser}/manifest.${browser}.json`);
   return deepMerge(base, override) as JsonObject;
 }
