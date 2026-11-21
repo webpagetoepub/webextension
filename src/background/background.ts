@@ -1,6 +1,9 @@
 import browser from "../lib/browser";
 import serializeActiveTab from "../lib/serialize_active_tab";
 import downloadEpub, { downloadFromBlobUrl } from "../lib/download_epub";
+import downloadEpubViaPage, {
+  downloadsApiUnavailable,
+} from "../lib/download_via_page";
 import convertViaOffscreen, {
   closeOffscreenDocument,
 } from "../lib/convert_via_offscreen";
@@ -58,14 +61,39 @@ function isGetConversionStatus(
 // this branch never runs, so the worker (which has no DOM) registers cleanly.
 // A static import bundled it into the worker and broke registration with
 // "DOMParser is not defined".
+// Whether to save via an in-page <a download> click instead of the downloads API.
+// Firefox Android (Fenix) is the trigger: its downloads API is either absent OR
+// present as a stub that never resolves (Bug 1538348), so a plain feature-check
+// isn't enough — if downloads.download exists-but-hangs, downloadEpub would wait
+// forever and freeze the conversion on "Converting…". So we treat os === "android"
+// as via-page regardless, and still fall back when the API is outright missing.
+async function savesEpubViaPage(): Promise<boolean> {
+  if (downloadsApiUnavailable(browser.downloads)) {
+    return true;
+  }
+  const { os } = await browser.runtime.getPlatformInfo();
+  return os === "android";
+}
+
 async function convertInlineAndDownload(
+  tabId: number,
   url: string,
   html: string,
 ): Promise<string> {
   const { default: convertPageToEpub } =
     await import("../lib/convert_page_to_epub");
+  console.log("[webpage2epub] converting inline…");
   const { title, epub } = await convertPageToEpub(url, html);
-  await downloadEpub(epub, title);
+  const viaPage = await savesEpubViaPage();
+  console.log(
+    `[webpage2epub] epub ready (${epub.size} bytes); saving ${viaPage ? "via page" : "via downloads API"}`,
+  );
+  if (viaPage) {
+    await downloadEpubViaPage(tabId, epub, title);
+  } else {
+    await downloadEpub(epub, title);
+  }
+  console.log("[webpage2epub] save complete");
   return title;
 }
 
@@ -96,10 +124,13 @@ async function convertActiveTab(): Promise<void> {
   }
   publishStatus({ state: "converting", title: await activeTabTitle() });
   try {
-    const { url, html } = await serializeActiveTab();
+    const { tabId, url, html } = await serializeActiveTab();
+    console.log(
+      `[webpage2epub] serialized tab ${tabId} (${html.length} chars of HTML)`,
+    );
     const title = RUNS_IN_SERVICE_WORKER
       ? await convertInOffscreenAndDownload(url, html)
-      : await convertInlineAndDownload(url, html);
+      : await convertInlineAndDownload(tabId, url, html);
     publishStatus({ state: "done", title });
   } catch (error) {
     publishStatus({

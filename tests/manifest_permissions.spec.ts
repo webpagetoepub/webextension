@@ -12,3 +12,15 @@ for (const browser of ["chrome", "firefox"] as const) {
     expect(manifest.permissions).toContain("contextMenus");
   });
 }
+
+// The Firefox build must declare gecko_android or AMO keeps the add-on desktop-only.
+// The downloads permission must survive the merge — desktop Firefox and Chrome still
+// use downloads.download; only Firefox Android falls back to the in-page save.
+test("firefox build is marked Android-compatible and keeps downloads", async () => {
+  const manifest = await mergeManifest("firefox");
+  const settings = manifest.browser_specific_settings as {
+    gecko_android?: unknown;
+  };
+  expect(settings.gecko_android).toBeTruthy();
+  expect(manifest.permissions).toContain("downloads");
+});
