@@ -17,16 +17,22 @@ function buildTargets(browser: Browser): string[] {
   return browser === "firefox" ? ["firefox115"] : ["chrome111"];
 }
 
-// All extension entry points. background runs on both browsers (Chrome service
-// worker / Firefox background page); offscreen is Chrome-only and gated out of
-// the Firefox build, which never references it (no manifest entry, inline path).
+// All extension entry points. The background has a per-browser entry (Chrome
+// service worker vs Firefox background page), both emitted as background.js via
+// the shared object key so the manifests need no change; offscreen is Chrome-only
+// and gated out of the Firefox build, which never references it (no manifest
+// entry, inline path).
 function entryPoints(browser: Browser): Record<string, string> {
+  const backgroundEntry =
+    browser === "firefox"
+      ? "src/firefox/background.firefox.ts"
+      : "src/chrome/background.chrome.ts";
   const entries: Record<string, string> = {
     popup: join(root, "src/popup/popup.ts"),
-    background: join(root, "src/background/background.ts"),
+    background: join(root, backgroundEntry),
   };
   if (browser === "chrome") {
-    entries.offscreen = join(root, "src/offscreen/offscreen.ts");
+    entries.offscreen = join(root, "src/chrome/offscreen/offscreen.ts");
   }
   return entries;
 }
@@ -77,7 +83,7 @@ async function buildBrowser(browser: Browser): Promise<void> {
   // it, so it is gated out of the Firefox build alongside its bundle.
   if (browser === "chrome") {
     await copyFile(
-      join(root, "src/offscreen/offscreen.html"),
+      join(root, "src/chrome/offscreen/offscreen.html"),
       join(outDir, "offscreen.html"),
     );
   }

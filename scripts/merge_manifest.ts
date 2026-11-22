@@ -5,12 +5,8 @@ import { dirname, join } from "node:path";
 type JsonValue = string | number | boolean | null | JsonValue[] | JsonObject;
 type JsonObject = { [key: string]: JsonValue };
 
-const manifestDir = join(
-  dirname(fileURLToPath(import.meta.url)),
-  "..",
-  "src",
-  "manifest",
-);
+const rootDir = join(dirname(fileURLToPath(import.meta.url)), "..");
+const srcDir = join(rootDir, "src");
 
 function isPlainObject(value: JsonValue): value is JsonObject {
   return typeof value === "object" && value !== null && !Array.isArray(value);
@@ -29,17 +25,35 @@ function deepMerge(base: JsonValue, override: JsonValue): JsonValue {
   return merged;
 }
 
-async function readJson(name: string): Promise<JsonValue> {
-  return JSON.parse(
-    await readFile(join(manifestDir, name), "utf8"),
-  ) as JsonValue;
+async function readJson(path: string): Promise<JsonValue> {
+  return JSON.parse(await readFile(join(srcDir, path), "utf8")) as JsonValue;
 }
 
-/** Build the final manifest object for a target browser ('chrome' | 'firefox'). */
+// package.json is the single source of truth for the version; the manifest's
+// own "version" is overwritten so a release only needs `npm version` bumped.
+async function packageVersion(): Promise<string> {
+  const pkg = JSON.parse(
+    await readFile(join(rootDir, "package.json"), "utf8"),
+  ) as { version?: unknown };
+  if (typeof pkg.version !== "string") {
+    throw new Error(
+      `package.json "version" must be a string, got ${JSON.stringify(pkg.version)}`,
+    );
+  }
+  return pkg.version;
+}
+
+/**
+ * Build the final manifest object for a target browser ('chrome' | 'firefox').
+ * The shared base lives in src/; each browser-specific override lives
+ * alongside that browser's code in src/<browser>/ (see the chrome/firefox split).
+ */
 export default async function mergeManifest(
   browser: string,
 ): Promise<JsonObject> {
   const base = await readJson("manifest.base.json");
-  const override = await readJson(`manifest.${browser}.json`);
-  return deepMerge(base, override) as JsonObject;
+  const override = await readJson(`${browser}/manifest.${browser}.json`);
+  const merged = deepMerge(base, override) as JsonObject;
+  merged.version = await packageVersion();
+  return merged;
 }

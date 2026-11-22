@@ -3,11 +3,16 @@ import browser from "./browser";
 export interface SerializedPage {
   url: string;
   html: string;
+  // The tab the HTML came from, so the save step can inject back into the same
+  // tab (Firefox Android download fallback) without a second tabs.query that
+  // could resolve a different tab if the user switched mid-conversion.
+  tabId: number;
 }
 
 // Injected into the active tab. Reads the live, already-rendered DOM so we never
 // re-fetch the page (a re-fetch would lose auth/session state and re-run scripts).
-function serializeCurrentDocument(): SerializedPage {
+// tabId is added by the caller, which is the only side that knows it.
+function serializeCurrentDocument(): Omit<SerializedPage, "tabId"> {
   return { url: location.href, html: document.documentElement.outerHTML };
 }
 
@@ -30,12 +35,14 @@ export default async function serializeActiveTab(): Promise<SerializedPage> {
     func: serializeCurrentDocument,
   });
 
-  const page = results[0]?.result as SerializedPage | undefined;
-  if (!page?.html) {
+  const result = results[0]?.result as
+    | Omit<SerializedPage, "tabId">
+    | undefined;
+  if (!result?.html) {
     throw new Error(
       `Failed to serialize active tab ${tab.id}; executeScript result: ${JSON.stringify(results[0])}`,
     );
   }
 
-  return page;
+  return { ...result, tabId: tab.id };
 }

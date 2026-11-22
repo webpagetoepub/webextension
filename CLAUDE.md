@@ -7,33 +7,35 @@ Browser extension for Chrome and Firefox that converts the current web page into
 - **Language**: TypeScript, compiled to JavaScript for browser execution.
 - **Framework**: None. Vanilla web extension APIs + a hand-written `manifest.json`. No WXT/Plasmo/CRXJS.
 - **Manifest**: Manifest V3. A single shared `manifest.json` source is used, with browser-specific tweaks applied at build time. The background is declared per browser: Chrome uses a `service_worker`, Firefox uses `background.scripts` (a background page). Chrome additionally holds the `offscreen` permission.
-- **Bundler**: esbuild. Bundles `src/popup/popup.ts`, `src/background/background.ts`, `src/offscreen/offscreen.ts` and inlines `html2epub` so everything runs browser-side. No remote code, no backend.
+- **Bundler**: esbuild. Bundles `src/popup/popup.ts`, the per-browser background entry (`src/chrome/background.chrome.ts` or `src/firefox/background.firefox.ts`) and `src/chrome/offscreen/offscreen.ts` and inlines `html2epub` so everything runs browser-side. No remote code, no backend.
 
 ## Capabilities
 
-- **Trigger**: Toolbar popup button, or a "Save page as ePub" **page context-menu** entry (`contextMenus` permission). Both send a `convert-active-tab` message / call `convertActiveTab` in the background, which does the work, so dismissing the popup no longer aborts conversion. The context-menu entry is registered in `background.ts` (`contextMenus.onClicked`) and additionally calls `chrome.action.openPopup()` so the popup opens and shows progress (best-effort: needs Chrome 127+ / a Firefox user gesture; conversion runs regardless).
+- **Trigger**: Toolbar popup button, or a "Save page as ePub" **page context-menu** entry (`contextMenus` permission). Both send a `convert-active-tab` message / call `convertActiveTab` in the background, which does the work, so dismissing the popup no longer aborts conversion. The context-menu entry is registered in `background_core.ts` (`contextMenus.onClicked`) and additionally calls `chrome.action.openPopup()` so the popup opens and shows progress (best-effort: needs Chrome 127+ / a Firefox user gesture; conversion runs regardless).
 - **Progress reporting**: The background owns conversion status (`ConversionStatus` in `src/lib/messages.ts`) so the popup shows progress no matter which trigger started the work. It broadcasts a `status-update` on every transition (idle → converting → done/error), and a freshly opened popup catches up via a `get-conversion-status` query. The popup is a passive view: `src/popup/status_view.ts` is the pure status→UI mapping (unit-tested in `tests/status_view.spec.ts`), and `popup.ts` just renders it and fires `convert-active-tab` on the button click.
 - **Content extraction**: The active tab's live DOM is read on demand via `chrome.scripting.executeScript` (injected function returning `document.documentElement.outerHTML`). The page is never refetched.
 - **Conversion**: `html2epub` needs DOM globals (`DOMParser`, `XMLSerializer`, `fetch`, …). It runs in the background context, which differs by browser:
-  - **Chrome**: the MV3 service worker has no DOM, so it spins up an **offscreen document** (`chrome.offscreen`, `src/offscreen/`) to convert and create the blob URL; the worker then triggers the download.
+  - **Chrome**: the MV3 service worker has no DOM, so it spins up an **offscreen document** (`chrome.offscreen`, `src/chrome/offscreen/`) to convert and create the blob URL; the worker then triggers the download.
   - **Firefox**: there is no offscreen API, but the background page has full DOM and API access, so it converts and downloads inline.
-  The split lives in `src/background/background.ts`, branching on `typeof document === "undefined"`. Cross-origin image fetching is covered by `host_permissions: ["<all_urls>"]`.
+  The split is structural, not a runtime branch: `src/background_core.ts` holds the browser-agnostic orchestration (status, message listeners, context menu) and takes the convert+download step as an injected `ConvertAndDownload` strategy; `src/chrome/background.chrome.ts` and `src/firefox/background.firefox.ts` are the per-browser entry points that supply their strategy (offscreen vs inline) and call `registerBackground`. The build points the `background` esbuild entry at the right source per browser (both emit `background.js`, so the manifests are unchanged). Cross-origin image fetching is covered by `host_permissions: ["<all_urls>"]`.
 - **Output**: The generated ePub is saved to the user's Downloads folder via `browser.downloads.download` (`webextension-polyfill` normalises the API across browsers).
 
 ## Layout
 
 ```
 src/
+  background_core.ts # browser-agnostic orchestration both entries import
+  html2epub.d.ts     # shared .d.ts stub (html2epub; typecheck only)
+  manifest.base.json # shared base manifest; browser fragments live in src/<browser>/
   popup/           # popup UI (HTML + TS) — thin trigger that messages the background
-  background/      # background.ts — Chrome service worker / Firefox background page
-  offscreen/       # offscreen.html + .ts — Chrome-only hidden DOM host for html2epub
+  chrome/          # Chrome-only code: background.chrome.ts entry, convert_via_offscreen.ts
+                   #   (worker-side offscreen client) + chrome_offscreen.d.ts,
+                   #   manifest.chrome.json, and offscreen/ (offscreen.html + .ts —
+                   #   hidden DOM host for html2epub)
+  firefox/         # Firefox-only code: background.firefox.ts entry, download_via_page.ts
+                   #   (Fenix download fallback), manifest.firefox.json
   lib/             # shared helpers: browser shim, html2epub wrapper, logger, downloader,
-                   #   convert_via_offscreen (Chrome), messages (cross-context contracts)
-  types/           # hand-written .d.ts stubs (html2epub, chrome.offscreen; typecheck only)
-  manifest/        # per-browser manifest fragments, merged at build time
-    manifest.base.json
-    manifest.chrome.json
-    manifest.firefox.json
+                   #   messages (cross-context contracts)
 scripts/           # esbuild scripts that merge manifests and bundle src/
 dist/              # generated; git-ignored
   chrome/
@@ -72,7 +74,7 @@ For Chromium tests:
 
 ## Conventions
 
-- Use `chrome.*` only behind `src/lib/browser.ts` (re-exports `webextension-polyfill`) so the same code works on Firefox. The one exception is `chrome.offscreen` (Chrome-only, absent from the polyfill), used solely in `src/lib/convert_via_offscreen.ts` behind the service-worker branch.
+- Use `chrome.*` only behind `src/lib/browser.ts` (re-exports `webextension-polyfill`) so the same code works on Firefox. The one exception is `chrome.offscreen` (Chrome-only, absent from the polyfill), used solely in `src/chrome/convert_via_offscreen.ts`, which only the Chrome entry (`background.chrome.ts`) imports.
 - Keep `html2epub` invocation in `src/lib/convert_page_to_epub.ts` — the single conversion entry point.
 - Never fetch remote scripts at runtime (MV3 forbids it and Firefox AMO rejects it).
 - Conversion runs in the background, not the popup, so the popup may be closed mid-conversion without aborting it. Cross-context message shapes live in `src/lib/messages.ts`.

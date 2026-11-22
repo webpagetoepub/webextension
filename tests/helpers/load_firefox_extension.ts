@@ -117,14 +117,17 @@ export default async function loadFirefoxExtension(
 
   // Firefox 138+ blocks WebDriver navigation to "unsafe" URLs (moz-extension://,
   // about:, chrome://) unless system access is explicitly allowed, so
-  // driver.get("moz-extension://<uuid>/harness.html") now fails with
-  // "Navigation to ... is not allowed in this context". geckodriver 0.36.0+
-  // exposes --allow-system-access, which sets RemoteAgent.allowSystemAccess and
-  // re-permits navigating to our own extension page. (See
-  // remote/marionette/driver.sys.mjs isWebdriverSafeNavigationURL gate.)
-  const service = new firefox.ServiceBuilder(geckodriverPath).addArguments(
-    "--allow-system-access",
-  );
+  // driver.get("moz-extension://<uuid>/harness.html") fails with "Navigation to
+  // ... is not allowed in this context". The opt-in changed across versions:
+  //   - 153–158: geckodriver's --allow-system-access flag is enough.
+  //   - 159+: that flag alone no longer suffices; Firefox must also see the
+  //     MOZ_REMOTE_ALLOW_SYSTEM_ACCESS=1 env var at launch (it inherits it from
+  //     geckodriver's process). See mozilla/geckodriver#2250 and MetaMask
+  //     metamask-extension#47589.
+  // We set both so the suite works on any Firefox >= 153.
+  const service = new firefox.ServiceBuilder(geckodriverPath)
+    .addArguments("--allow-system-access")
+    .setEnvironment({ ...process.env, MOZ_REMOTE_ALLOW_SYSTEM_ACCESS: "1" });
   const driver = await new Builder()
     .forBrowser("firefox")
     .setFirefoxOptions(firefoxOptions)
