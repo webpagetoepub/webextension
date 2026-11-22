@@ -22,7 +22,7 @@
     "test": "playwright test"
   },
   "dependencies": {
-    "html2epub": "github:webpagetoepub/html2epub#665e733f080af8e5526a07eae6303c202f7a26ad",
+    "html2epub": "github:webpagetoepub/html2epub#4c70da78eab25094b338181c26a0f663a5e88990",
     "webextension-polyfill": "^0.12.0"
   },
   "devDependencies": {
