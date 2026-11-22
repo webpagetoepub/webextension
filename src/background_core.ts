@@ -6,6 +6,7 @@ import {
   GetConversionStatusMessage,
   StatusUpdateMessage,
 } from "./lib/messages";
+import reportConversionError from "./lib/report_conversion_error";
 
 // Browser-agnostic background orchestration. Owns conversion status, the two
 // triggers (popup button + page context menu) and the context menu itself, and
@@ -17,6 +18,11 @@ import {
 // Per-browser convert+download step. Receives the serialized active tab and
 // returns the resulting document title (used for the "done" status).
 export type ConvertAndDownload = (page: SerializedPage) => Promise<string>;
+
+// Optional per-browser failure notifier. The published "error" status is enough on
+// Chrome and Firefox desktop (the popup renders it), but Firefox Android has no
+// popup, so its entry supplies this to surface the failure in-page. Chrome omits it.
+export type NotifyConversionError = (message: string) => void;
 
 // The background owns conversion progress so both triggers feed one status
 // stream. A popup opened from the context menu — which it didn't start — reads
@@ -61,6 +67,7 @@ async function activeTabTitle(): Promise<string | undefined> {
 // the status. The guard drops a second trigger while one is already in flight.
 async function convertActiveTab(
   convertAndDownload: ConvertAndDownload,
+  onConversionError?: NotifyConversionError,
 ): Promise<void> {
   if (currentStatus.state === "converting") {
     return;
@@ -74,10 +81,7 @@ async function convertActiveTab(
     const title = await convertAndDownload(page);
     publishStatus({ state: "done", title });
   } catch (error) {
-    publishStatus({
-      state: "error",
-      message: error instanceof Error ? error.message : String(error),
-    });
+    reportConversionError(error, publishStatus, onConversionError);
   }
 }
 
@@ -125,15 +129,16 @@ export type StartConversion = () => void;
  */
 export default function registerBackground(
   convertAndDownload: ConvertAndDownload,
+  onConversionError?: NotifyConversionError,
 ): StartConversion {
   const startConversion: StartConversion = () => {
-    void convertActiveTab(convertAndDownload);
+    void convertActiveTab(convertAndDownload, onConversionError);
   };
 
   browser.runtime.onMessage.addListener((message: unknown) => {
     if (isConvertActiveTab(message)) {
       // Returning the promise keeps the MV3 worker alive until conversion ends.
-      return convertActiveTab(convertAndDownload);
+      return convertActiveTab(convertAndDownload, onConversionError);
     }
     if (isGetConversionStatus(message)) {
       return Promise.resolve(currentStatus);

@@ -8,6 +8,7 @@ import downloadEpub from "../lib/download_epub";
 import downloadEpubViaPage, {
   downloadsApiUnavailable,
 } from "./download_via_page";
+import notifyErrorInPage from "./notify_error_in_page";
 
 // Firefox entry point (background page). Unlike the Chrome service worker it has
 // full DOM + downloads API, so it converts and saves inline here. convert_page_to_epub
@@ -73,4 +74,12 @@ function registerToolbarTap(startConversion: StartConversion): void {
   void setDesktopPopup();
 }
 
-registerToolbarTap(registerBackground(convertInlineAndDownload));
+// Pass a failure notifier so Fenix — which has no popup to render the published
+// error status — surfaces conversion failures with an in-page toast. The notifier
+// gates on os === "android" internally (see notify_error_in_page.ts), so desktop
+// Firefox is unaffected and keeps showing errors in its popup.
+registerToolbarTap(
+  registerBackground(convertInlineAndDownload, (message) => {
+    void notifyErrorInPage(message);
+  }),
+);
